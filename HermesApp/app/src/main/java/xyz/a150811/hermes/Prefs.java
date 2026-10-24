@@ -45,6 +45,14 @@ public final class Prefs {
         p(c).edit().putBoolean("immersive_nav", v).apply();
     }
 
+    public static boolean notifyAsked(Context c) {
+        return p(c).getBoolean("notify_asked", false);
+    }
+
+    public static void setNotifyAsked(Context c, boolean v) {
+        p(c).edit().putBoolean("notify_asked", v).apply();
+    }
+
     public static void setFnosSession(Context c, boolean v) {
         p(c).edit().putBoolean("fnos_session", v).apply();
     }

@@ -1,9 +1,12 @@
 package xyz.a150811.hermes;
 
+import android.Manifest;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -23,6 +26,7 @@ import java.util.concurrent.Executors;
 public class MainActivity extends Activity {
     private static final int REQ_SETTINGS = 100;
     private static final int REQ_WEB = 101;
+    private static final int REQ_NOTIFY = 102;
 
     private LinearLayout endpointList;
     private TextView statusTitle;
@@ -130,6 +134,16 @@ public class MainActivity extends Activity {
             probeAll();
             scanLan(false);
         }
+        askNotifyPermission();
+    }
+
+    private void askNotifyPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return;
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED) return;
+        if (Prefs.notifyAsked(this)) return;
+        Prefs.setNotifyAsked(this, true);
+        requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIFY);
     }
 
     private void openSettings() {

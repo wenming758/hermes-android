@@ -52,6 +52,8 @@
     <string name="web_switched_lan">网络已切换，已自动改用局域网线路</string>
     <string name="web_switched_line">网络已切换，已自动改用「%s」</string>
     <string name="web_reconnected">网络已切换，已重新连接</string>
+    <string name="web_auto_reconnect">连接中断，正在自动恢复…</string>
+    <string name="web_auto_reconnect_failed">自动恢复未成功，请点右上角刷新重试</string>
     <string name="web_title">Hermes</string>
     <string name="menu_refresh">刷新</string>
     <string name="menu_switch">切换线路</string>
@@ -89,6 +91,11 @@
     <string name="settings_desktop">桌面版网页（大屏排版）</string>
     <string name="settings_keep_on">对话时保持屏幕常亮</string>
     <string name="settings_immersive">对话时隐藏底部导航栏（全屏）</string>
+    <string name="settings_notify_on">通知权限：已开启（点按管理）</string>
+    <string name="settings_notify_off">通知权限：未开启（点按开启）</string>
+    <string name="settings_notify_failed">无法打开通知设置，请到系统设置中手动开启</string>
+    <string name="notify_channel">Hermes 通知</string>
+    <string name="notify_channel_desc">用于显示 Hermes 的连接与提醒消息</string>
     <string name="settings_lines">线路</string>
     <string name="settings_add">添加</string>
     <string name="settings_line_hint">点按编辑，长按删除。局域网可自动扫描；外网地址手动添加，支持 IPv6 字面量，例如 http://[240e:…]:5666/</string>

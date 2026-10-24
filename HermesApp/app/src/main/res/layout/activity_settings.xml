@@ -100,6 +100,19 @@
                 android:text="@string/settings_immersive"
                 android:textColor="@color/ink"
                 android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/notifyBtn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_btn_secondary"
+                android:minHeight="42dp"
+                android:stateListAnimator="@null"
+                android:text="@string/settings_notify_off"
+                android:textAllCaps="false"
+                android:textColor="@color/ink"
+                android:textSize="13sp" />
         </LinearLayout>
 
         <LinearLayout

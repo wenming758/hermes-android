@@ -96,10 +96,16 @@ public class WebActivity extends Activity {
 
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final Runnable netSwitchTask = this::onNetworkSwitch;
+    private final Runnable healthTask = this::checkPageHealth;
     private ConnectivityManager.NetworkCallback networkCallback;
     private ExecutorService netPool;
     private int lastTransport = -1;
     private boolean netSwitchPending;
+    private int badHealthChecks;
+    private int autoReloads;
+    private long lastAutoReload;
+    private long pausedAt;
+    private boolean resumed;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -209,11 +215,11 @@ public class WebActivity extends Activity {
     private void refresh() {
         if (captureMode) {
             load(loginBase);
-        } else if (lastUrl != null) {
-            load(lastUrl);
-        } else if (webView.getUrl() != null) {
-            load(webView.getUrl());
+            return;
         }
+        String url = webView.getUrl();
+        if (url == null) url = lastUrl;
+        if (url != null) load(url);
     }
 
     private void retry() {
@@ -223,6 +229,74 @@ public class WebActivity extends Activity {
         } else {
             load(lastUrl != null ? lastUrl : startUrl);
         }
+    }
+
+    private void scheduleHealth(long delay) {
+        ui.removeCallbacks(healthTask);
+        ui.postDelayed(healthTask, delay);
+    }
+
+    private void checkPageHealth() {
+        if (isFinishing() || isDestroyed() || captureMode || !resumed) return;
+        if (errorOverlay.getVisibility() == View.VISIBLE || webView.getUrl() == null) {
+            scheduleHealth(12000);
+            return;
+        }
+        final long now = SystemClock.elapsedRealtime();
+        try {
+            webView.evaluateJavascript(healthScript(), value -> {
+                if (isFinishing() || isDestroyed() || !resumed) return;
+                boolean bad = value != null && value.contains("1");
+                if (!bad) {
+                    badHealthChecks = 0;
+                    if (lastAutoReload > 0 && now - lastAutoReload > 300000) autoReloads = 0;
+                } else if (++badHealthChecks >= 2) {
+                    badHealthChecks = 0;
+                    autoReconnect();
+                }
+                scheduleHealth(bad ? 3000 : 12000);
+            });
+        } catch (Exception e) {
+            scheduleHealth(12000);
+        }
+    }
+
+    private void autoReconnect() {
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastAutoReload < 15000) return;
+        if (autoReloads >= 3) {
+            UiUtil.toast(this, getString(R.string.web_auto_reconnect_failed));
+            return;
+        }
+        String url = webView.getUrl();
+        if (url == null) url = lastUrl;
+        if (url == null) return;
+        autoReloads++;
+        lastAutoReload = now;
+        UiUtil.toast(this, getString(R.string.web_auto_reconnect));
+        load(url);
+    }
+
+    /**
+     * Runs inside the page and returns "1" when the Hermes UI shows a red
+     * disconnected badge ("失联" etc.) or the device reports offline.
+     */
+    private static String healthScript() {
+        return "(function(){"
+                + "if(navigator.onLine===false)return '1';"
+                + "var pat=/^(失联|离线|连接已断开|连接中断)$/;"
+                + "var es=document.querySelectorAll('span,div,p,button,li');"
+                + "for(var i=0;i<es.length&&i<2000;i++){var el=es[i];"
+                + "if(el.children&&el.children.length)continue;"
+                + "var t=(el.textContent||'').trim();"
+                + "if(t.length>5||!pat.test(t))continue;"
+                + "var r=el.getBoundingClientRect();"
+                + "if(r.width<=0||r.height<=0)continue;"
+                + "var cs=getComputedStyle(el);var fg=cs.color.match(/\\d+/g);"
+                + "var bg=cs.backgroundColor.match(/\\d+/g);"
+                + "if((fg&&+fg[0]>150&&+fg[1]<110&&+fg[2]<110)||"
+                + "(bg&&bg.length>=3&&+bg[0]>150&&+bg[1]<110&&+bg[2]<110))return '1'}"
+                + "return '0'})()";
     }
 
     private void enterCapture(String base) {
@@ -235,6 +309,7 @@ public class WebActivity extends Activity {
         }
         captureMode = true;
         captured = false;
+        ui.removeCallbacks(healthTask);
         loginBase = base;
         captureBanner.setVisibility(View.VISIBLE);
         errorOverlay.setVisibility(View.GONE);
@@ -561,6 +636,7 @@ public class WebActivity extends Activity {
             }
             long ms = pageStart > 0 ? SystemClock.elapsedRealtime() - pageStart : 0;
             statusView.setText(getString(R.string.web_connected, ms));
+            badHealthChecks = 0;
             checkInvalidToken();
         }
 
@@ -1042,15 +1118,24 @@ public class WebActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        resumed = true;
         if (Prefs.immersive(this)) {
             UiUtil.applyImmersiveNav(this);
         }
         webView.onResume();
         registerNetwork();
+        long away = pausedAt > 0 ? SystemClock.elapsedRealtime() - pausedAt : 0;
+        pausedAt = 0;
+        if (!captureMode) {
+            scheduleHealth(away > 15000 ? 800 : 12000);
+        }
     }
 
     @Override
     protected void onPause() {
+        resumed = false;
+        pausedAt = SystemClock.elapsedRealtime();
+        ui.removeCallbacks(healthTask);
         webView.onPause();
         unregisterNetwork();
         super.onPause();

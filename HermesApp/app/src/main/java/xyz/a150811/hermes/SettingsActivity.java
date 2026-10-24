@@ -1,12 +1,18 @@
 package xyz.a150811.hermes;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.NotificationManager;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.WebStorage;
@@ -26,6 +32,7 @@ public class SettingsActivity extends Activity {
     private LinearLayout list;
     private TextView empty;
     private Button scanBtn;
+    private Button notifyBtn;
     private List<Endpoint> endpoints;
     private boolean changed;
     private boolean scanning;
@@ -49,6 +56,8 @@ public class SettingsActivity extends Activity {
         Switch desktop = findViewById(R.id.switchDesktop);
         Switch keepOn = findViewById(R.id.switchKeepOn);
         Switch immersive = findViewById(R.id.switchImmersive);
+        notifyBtn = findViewById(R.id.notifyBtn);
+        notifyBtn.setOnClickListener(v -> openNotifySettings());
 
         auto.setChecked(Prefs.autoConnect(this));
         desktop.setChecked(Prefs.desktopUa(this));
@@ -94,6 +103,55 @@ public class SettingsActivity extends Activity {
 
         endpoints = EndpointStore.load(this);
         render();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        updateNotifyLabel();
+    }
+
+    private void updateNotifyLabel() {
+        notifyBtn.setText(notifyEnabled()
+                ? R.string.settings_notify_on : R.string.settings_notify_off);
+    }
+
+    private boolean notifyEnabled() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            return false;
+        }
+        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        return nm != null && nm.areNotificationsEnabled();
+    }
+
+    private void openNotifySettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 200);
+            return;
+        }
+        try {
+            Intent i = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+            startActivity(i);
+        } catch (Exception e) {
+            try {
+                startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + getPackageName())));
+            } catch (Exception ignored) {
+                UiUtil.toast(this, getString(R.string.settings_notify_failed));
+            }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                                           int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        updateNotifyLabel();
     }
 
     private void render() {
