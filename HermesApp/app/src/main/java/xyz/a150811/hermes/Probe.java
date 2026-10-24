@@ -75,7 +75,22 @@ public final class Probe {
     private static Result probeDirect(Endpoint ep) {
         Result r = new Result();
         String[] baseOut = new String[1];
+        // Mobile IPv6 blips (idle radio, ND not settled, resolver still serving the
+        // previous AAAA) look exactly like a closed port for one attempt, so retry:
+        // one immediate round, then one after a short pause, within a hard deadline.
+        long deadline = SystemClock.elapsedRealtime() + 9000;
         Http h = fetchSmart(ep.url, 2500, 3000, baseOut);
+        for (int round = 1; h.error != null && round < 3; round++) {
+            if (SystemClock.elapsedRealtime() >= deadline) break;
+            if (round == 2) {
+                try {
+                    Thread.sleep(900);
+                } catch (InterruptedException ie) {
+                    break;
+                }
+            }
+            h = fetchSmart(ep.url, 2500, 3000, baseOut);
+        }
         r.base = baseOut[0];
         if (h.error != null) {
             r.detail = h.error;
@@ -316,8 +331,9 @@ public final class Probe {
 
     /**
      * Fetches a URL. When the hostname cannot be resolved, or the returned
-     * address no longer answers (stale AAAA after an IPv6 prefix change),
-     * re-resolves via public DNS and retries against the IPv6 literal.
+     * address no longer answers (stale record after a prefix change),
+     * re-resolves via public DNS and retries against the literal — AAAA
+     * first, then A — so IPv6-only and IPv4-only domains both recover.
      * The literal base is returned through baseOut[0].
      */
     private static Http fetchSmart(String url, int connectMs, int readMs, String[] baseOut) {
@@ -336,11 +352,7 @@ public final class Probe {
             if (!hasGlobalIpv6()) h.error = "当前网络无 IPv6";
             return h;
         }
-
-        boolean dnsFailed = "域名解析失败".equals(h.error);
-        String addr = dnsFailed ? Doh.resolveIpv6(host) : Doh.resolveIpv6Fresh(host);
-        if (addr == null) {
-            if (dnsFailed) h.error = "解析不到 IPv6 地址";
+        if (host.matches("(\\d{1,3}\\.){3}\\d{1,3}")) {
             return h;
         }
 
@@ -348,18 +360,37 @@ public final class Probe {
         if (path == null || path.isEmpty()) path = "/";
         String query = u.getEncodedQuery();
         if (query != null && !query.isEmpty()) path += "?" + query;
-
         int port = u.getPort();
-        String base = scheme + "://[" + addr + "]" + (port > 0 ? ":" + port : "");
-        Http h2 = fetch(base + path, connectMs, readMs);
-        if (h2.error == null) {
+
+        boolean dnsFailed = "域名解析失败".equals(h.error);
+        String a6 = dnsFailed ? Doh.resolveIpv6(host) : Doh.resolveIpv6Fresh(host);
+        if (a6 != null) {
+            Http h6 = fetchLiteral(scheme, a6, port, path, connectMs, readMs, baseOut);
+            if (h6.error == null) return h6;
+            h = h6;
+        }
+        String a4 = dnsFailed ? Doh.resolveIpv4(host) : Doh.resolveIpv4Fresh(host);
+        if (a4 != null) {
+            Http h4 = fetchLiteral(scheme, a4, port, path, connectMs, readMs, baseOut);
+            if (h4.error == null) return h4;
+            if (a6 == null) h = h4;
+        }
+        if (dnsFailed && a6 == null && a4 == null) {
+            h.error = "解析不到可用地址";
+        }
+        return h;
+    }
+
+    private static Http fetchLiteral(String scheme, String addr, int port, String path,
+                                     int connectMs, int readMs, String[] baseOut) {
+        boolean v6 = addr.indexOf(':') >= 0;
+        String base = scheme + "://" + (v6 ? "[" + addr + "]" : addr)
+                + (port > 0 ? ":" + port : "");
+        Http r = fetch(base + path, connectMs, readMs);
+        if (r.error == null && baseOut != null) {
             baseOut[0] = base;
-            return h2;
         }
-        if (!hasGlobalIpv6()) {
-            h2.error = "当前网络无 IPv6";
-        }
-        return h2;
+        return r;
     }
 
     private static boolean isHermes(Http h) {
