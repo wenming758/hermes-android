@@ -75,10 +75,11 @@ public final class Probe {
     private static Result probeDirect(Endpoint ep) {
         Result r = new Result();
         String[] baseOut = new String[1];
-        // Mobile IPv6 blips (idle radio, ND not settled, resolver still serving the
-        // previous AAAA) look exactly like a closed port for one attempt, so retry:
-        // one immediate round, then one after a short pause, within a hard deadline.
-        long deadline = SystemClock.elapsedRealtime() + 9000;
+        // Mobile network blips (idle radio, ND not settled, a resolver still
+        // serving the previous address) look exactly like a dead line for one
+        // attempt; fetchSmart already races independent DNS sources, so keep a
+        // couple of whole-round retries within a hard deadline.
+        long deadline = SystemClock.elapsedRealtime() + 16000;
         Http h = fetchSmart(ep.url, 2500, 3000, baseOut);
         for (int round = 1; h.error != null && round < 3; round++) {
             if (SystemClock.elapsedRealtime() >= deadline) break;
@@ -331,9 +332,10 @@ public final class Probe {
 
     /**
      * Fetches a URL. When the hostname cannot be resolved, or the returned
-     * address no longer answers (stale record after a prefix change),
-     * re-resolves via public DNS and retries against the literal — AAAA
-     * first, then A — so IPv6-only and IPv4-only domains both recover.
+     * address no longer answers, collects candidate addresses from
+     * independent DNS sources and races connections to all of them in
+     * parallel — AAAA candidates first, then A — so one stale answer from
+     * any single resolver cannot mark a reachable line as failed.
      * The literal base is returned through baseOut[0].
      */
     private static Http fetchSmart(String url, int connectMs, int readMs, String[] baseOut) {
@@ -362,35 +364,63 @@ public final class Probe {
         if (query != null && !query.isEmpty()) path += "?" + query;
         int port = u.getPort();
 
-        boolean dnsFailed = "域名解析失败".equals(h.error);
-        String a6 = dnsFailed ? Doh.resolveIpv6(host) : Doh.resolveIpv6Fresh(host);
-        if (a6 != null) {
-            Http h6 = fetchLiteral(scheme, a6, port, path, connectMs, readMs, baseOut);
-            if (h6.error == null) return h6;
-            h = h6;
+        List<String> addrs = Doh.resolveCandidates(host);
+        if (!hasGlobalIpv6()) {
+            List<String> v4Only = new ArrayList<>();
+            for (String a : addrs) {
+                if (a.indexOf(':') < 0) v4Only.add(a);
+            }
+            addrs = v4Only;
         }
-        String a4 = dnsFailed ? Doh.resolveIpv4(host) : Doh.resolveIpv4Fresh(host);
-        if (a4 != null) {
-            Http h4 = fetchLiteral(scheme, a4, port, path, connectMs, readMs, baseOut);
-            if (h4.error == null) return h4;
-            if (a6 == null) h = h4;
+        if (addrs.isEmpty()) {
+            if ("域名解析失败".equals(h.error)) h.error = "解析不到可用地址";
+            return h;
         }
-        if (dnsFailed && a6 == null && a4 == null) {
-            h.error = "解析不到可用地址";
+        Http win = raceFetch(scheme, addrs, port, path, connectMs, readMs);
+        if (win.error == null) {
+            baseOut[0] = baseOf(win.url);
+            return win;
         }
-        return h;
+        return win;
+    }
+
+    /** Connects to every candidate at once; the first HTTP answer wins. */
+    private static Http raceFetch(String scheme, List<String> addrs, int port, String path,
+                                  int connectMs, int readMs) {
+        ExecutorService ex = Executors.newFixedThreadPool(Math.min(addrs.size(), 4));
+        try {
+            List<Future<Http>> fs = new ArrayList<>();
+            for (final String a : addrs) {
+                fs.add(ex.submit(() -> fetchLiteral(scheme, a, port, path, connectMs, readMs)));
+            }
+            Http firstError = null;
+            for (Future<Http> f : fs) {
+                Http r;
+                try {
+                    r = f.get(connectMs + readMs + 2000L, TimeUnit.MILLISECONDS);
+                } catch (Exception e) {
+                    r = null;
+                }
+                if (r != null && r.error == null) {
+                    for (Future<Http> g : fs) {
+                        g.cancel(true);
+                    }
+                    return r;
+                }
+                if (r != null && firstError == null) firstError = r;
+            }
+            return firstError;
+        } finally {
+            ex.shutdownNow();
+        }
     }
 
     private static Http fetchLiteral(String scheme, String addr, int port, String path,
-                                     int connectMs, int readMs, String[] baseOut) {
+                                     int connectMs, int readMs) {
         boolean v6 = addr.indexOf(':') >= 0;
         String base = scheme + "://" + (v6 ? "[" + addr + "]" : addr)
                 + (port > 0 ? ":" + port : "");
-        Http r = fetch(base + path, connectMs, readMs);
-        if (r.error == null && baseOut != null) {
-            baseOut[0] = base;
-        }
-        return r;
+        return fetch(base + path, connectMs, readMs);
     }
 
     private static boolean isHermes(Http h) {

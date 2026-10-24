@@ -14,18 +14,22 @@ import java.net.InetAddress;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  * DNS fallback resolver for phones whose system DNS hides answers or serves
- * stale records. Tries system DNS, then DNS-over-HTTPS, then plain UDP DNS,
- * for both AAAA (IPv6) and A (IPv4) lookups.
+ * stale records. Collects candidate addresses from independent sources —
+ * system DNS, plain UDP DNS and DNS-over-HTTPS, for both AAAA and A — so a
+ * stale answer from any single source cannot hide a fresh one.
  */
 public final class Doh {
-    private static final long TTL_OK = 10 * 60 * 1000L;
-    private static final long TTL_FAIL = 60 * 1000L;
     private static final String[] DOH_AAAA = {
             "https://dns.alidns.com/resolve?name=%s&type=AAAA",
             "https://1.1.1.1/dns-query?name=%s&type=AAAA",
@@ -37,68 +41,45 @@ public final class Doh {
             "https://1.0.0.1/dns-query?name=%s&type=A"
     };
     private static final String[] UDP_DNS = {"223.5.5.5", "119.29.29.29", "8.8.8.8"};
-    private static final Map<String, Entry> CACHE = new HashMap<>();
 
     private Doh() {
     }
 
-    private static class Entry {
-        String addr;
-        long at;
-        long ttl;
+    /** Distinct usable addresses, IPv6 first then IPv4; empty when none. */
+    public static List<String> resolveCandidates(final String host) {
+        final String h = clean(host);
+        if (h == null) return Collections.emptyList();
+        ExecutorService ex = Executors.newFixedThreadPool(4);
+        List<Future<String>> fs = new ArrayList<>();
+        fs.add(ex.submit(() -> fresh(h, true)));
+        fs.add(ex.submit(() -> system(h, true)));
+        fs.add(ex.submit(() -> fresh(h, false)));
+        fs.add(ex.submit(() -> system(h, false)));
+        List<String> out = new ArrayList<>();
+        for (Future<String> f : fs) {
+            try {
+                String a = f.get(4500, TimeUnit.MILLISECONDS);
+                if (a != null && !out.contains(a)) out.add(a);
+            } catch (Exception ignored) {
+            }
+        }
+        ex.shutdownNow();
+        return out;
     }
 
-    public static synchronized String resolveIpv6(String host) {
-        return resolve(host, false, true);
-    }
-
-    /** Re-resolves via public DNS, ignoring both system DNS and the local cache. */
-    public static synchronized String resolveIpv6Fresh(String host) {
-        return resolve(host, true, true);
-    }
-
-    public static synchronized String resolveIpv4(String host) {
-        return resolve(host, false, false);
-    }
-
-    /** Re-resolves an A record via public DNS, ignoring system DNS and the cache. */
-    public static synchronized String resolveIpv4Fresh(String host) {
-        return resolve(host, true, false);
-    }
-
-    private static String resolve(String host, boolean preferPublic, boolean v6) {
+    private static String clean(String host) {
         if (host == null) return null;
-        host = host.trim();
-        if (host.startsWith("[") && host.endsWith("]")) {
-            host = host.substring(1, host.length() - 1);
-        }
-        if (host.isEmpty()) return null;
-        if (host.indexOf(':') >= 0) return v6 ? host : null;
+        String h = host.trim();
+        if (h.startsWith("[") && h.endsWith("]")) h = h.substring(1, h.length() - 1);
+        if (h.isEmpty() || h.indexOf(':') >= 0) return null;
+        if (h.matches("(\\d{1,3}\\.){3}\\d{1,3}")) return null;
+        return h;
+    }
 
-        String key = v6 ? host : host + "|A";
-        long now = System.currentTimeMillis();
-        if (!preferPublic) {
-            Entry c = CACHE.get(key);
-            if (c != null && now - c.at < c.ttl) return c.addr;
-        }
-
-        String addr;
-        if (preferPublic) {
-            addr = udp(host, v6);
-            if (addr == null) addr = doh(host, v6);
-            if (addr == null) addr = system(host, v6);
-        } else {
-            addr = system(host, v6);
-            if (addr == null) addr = udp(host, v6);
-            if (addr == null) addr = doh(host, v6);
-        }
-
-        Entry e = new Entry();
-        e.addr = addr;
-        e.at = now;
-        e.ttl = addr == null ? TTL_FAIL : TTL_OK;
-        CACHE.put(key, e);
-        return addr;
+    /** Public DNS only, ignoring the OS resolver: UDP first, then DoH. */
+    private static String fresh(String host, boolean v6) {
+        String a = udp(host, v6);
+        return a != null ? a : doh(host, v6);
     }
 
     private static String system(String host, boolean v6) {
@@ -138,8 +119,8 @@ public final class Doh {
             try {
                 URL u = new URL(String.format(tpl, q));
                 c = (HttpURLConnection) u.openConnection();
-                c.setConnectTimeout(1800);
-                c.setReadTimeout(1800);
+                c.setConnectTimeout(1500);
+                c.setReadTimeout(1500);
                 c.setRequestProperty("Accept", "application/dns-json");
                 c.setRequestProperty("User-Agent", "HermesApp/1.0");
                 if (c.getResponseCode() != 200) continue;
@@ -193,7 +174,7 @@ public final class Doh {
             DatagramSocket sock = null;
             try {
                 sock = new DatagramSocket();
-                sock.setSoTimeout(1800);
+                sock.setSoTimeout(1200);
                 InetAddress to = InetAddress.getByName(server);
                 sock.send(new DatagramPacket(query, query.length, to, 53));
                 byte[] buf = new byte[1500];
