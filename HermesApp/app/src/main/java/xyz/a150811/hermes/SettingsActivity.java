@@ -3,13 +3,19 @@ package xyz.a150811.hermes;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.DownloadManager;
 import android.app.NotificationManager;
+import android.content.BroadcastReceiver;
+import android.content.ClipData;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
@@ -33,6 +39,10 @@ public class SettingsActivity extends Activity {
     private TextView empty;
     private Button scanBtn;
     private Button notifyBtn;
+    private Button updateBtn;
+    private long downloadId = -1;
+    private long downloadedId = -1;
+    private BroadcastReceiver downloadReceiver;
     private List<Endpoint> endpoints;
     private boolean changed;
     private boolean scanning;
@@ -58,6 +68,8 @@ public class SettingsActivity extends Activity {
         Switch immersive = findViewById(R.id.switchImmersive);
         notifyBtn = findViewById(R.id.notifyBtn);
         notifyBtn.setOnClickListener(v -> openNotifySettings());
+        updateBtn = findViewById(R.id.updateBtn);
+        updateBtn.setOnClickListener(v -> checkUpdate());
 
         auto.setChecked(Prefs.autoConnect(this));
         desktop.setChecked(Prefs.desktopUa(this));
@@ -86,6 +98,7 @@ public class SettingsActivity extends Activity {
         scanBtn.setOnClickListener(v -> scanLan());
         reset.setOnClickListener(v -> confirm(getString(R.string.settings_reset_confirm), () -> {
             EndpointStore.save(this, new ArrayList<Endpoint>());
+            Prefs.setSelectedLine(this, "");
             endpoints = EndpointStore.load(this);
             render();
             changed = true;
@@ -109,6 +122,138 @@ public class SettingsActivity extends Activity {
     protected void onResume() {
         super.onResume();
         updateNotifyLabel();
+        if (downloadedId != -1 && canInstallPackages()) {
+            long id = downloadedId;
+            downloadedId = -1;
+            installDownloaded(id);
+        }
+    }
+
+    private boolean canInstallPackages() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.O
+                || getPackageManager().canRequestPackageInstalls();
+    }
+
+    private void checkUpdate() {
+        updateBtn.setEnabled(false);
+        updateBtn.setText(R.string.update_checking);
+        UpdateChecker.check(this, (release, error) -> {
+            if (isFinishing() || isDestroyed()) return;
+            updateBtn.setEnabled(true);
+            updateBtn.setText(R.string.update_check);
+            if (error != null) {
+                UiUtil.toast(this, getString(R.string.update_failed, error));
+                return;
+            }
+            if (release == null) {
+                UiUtil.toast(this, getString(R.string.update_latest, BuildConfig.VERSION_NAME));
+                return;
+            }
+            showUpdateDialog(release);
+        });
+    }
+
+    private void showUpdateDialog(UpdateChecker.Release release) {
+        String notes = release.notes == null ? "" : release.notes.trim();
+        if (notes.isEmpty()) notes = getString(R.string.update_notes_empty);
+        if (notes.length() > 1200) notes = notes.substring(0, 1200) + "…";
+        notes += "\n\n更新源：github.com/wenming758/hermes-android";
+        new AlertDialog.Builder(this, R.style.DialogTheme)
+                .setTitle(getString(R.string.update_found_title, release.version))
+                .setMessage(notes)
+                .setPositiveButton(R.string.update_download,
+                        (d, w) -> startDownload(release))
+                .setNegativeButton(R.string.dialog_cancel, null)
+                .show();
+    }
+
+    private void startDownload(UpdateChecker.Release release) {
+        try {
+            DownloadManager.Request req =
+                    new DownloadManager.Request(Uri.parse(release.apkUrl));
+            req.setTitle("Hermes " + release.version);
+            req.setMimeType("application/vnd.android.package-archive");
+            req.setNotificationVisibility(
+                    DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            req.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS,
+                    "Hermes-" + release.version + ".apk");
+            DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            if (dm == null) throw new IllegalStateException("no download manager");
+            downloadId = dm.enqueue(req);
+            registerDownloadReceiver();
+            UiUtil.toast(this, getString(R.string.update_downloading));
+        } catch (Exception e) {
+            UiUtil.toast(this, getString(R.string.update_download_failed));
+        }
+    }
+
+    private void registerDownloadReceiver() {
+        if (downloadReceiver != null) return;
+        downloadReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+                if (id == downloadId) installDownloaded(id);
+            }
+        };
+        try {
+            IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(downloadReceiver, filter, Context.RECEIVER_EXPORTED);
+            } else {
+                registerReceiver(downloadReceiver, filter);
+            }
+        } catch (Exception e) {
+            downloadReceiver = null;
+        }
+    }
+
+    private void unregisterDownloadReceiver() {
+        if (downloadReceiver != null) {
+            try {
+                unregisterReceiver(downloadReceiver);
+            } catch (Exception ignored) {
+            }
+            downloadReceiver = null;
+        }
+    }
+
+    private void installDownloaded(long id) {
+        DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+        Uri uri = dm == null ? null : dm.getUriForDownloadedFile(id);
+        if (uri == null) {
+            UiUtil.toast(this, getString(R.string.update_download_failed));
+            return;
+        }
+        if (!canInstallPackages()) {
+            downloadedId = id;
+            new AlertDialog.Builder(this, R.style.DialogTheme)
+                    .setTitle(R.string.update_allow_title)
+                    .setMessage(R.string.update_allow_msg)
+                    .setPositiveButton(R.string.update_allow_go,
+                            (d, w) -> openInstallPermission())
+                    .setNegativeButton(R.string.dialog_cancel, null)
+                    .show();
+            return;
+        }
+        Intent i = new Intent(Intent.ACTION_VIEW);
+        i.setDataAndType(uri, "application/vnd.android.package-archive");
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        i.setClipData(ClipData.newRawUri("", uri));
+        try {
+            startActivity(i);
+        } catch (Exception e) {
+            UiUtil.toast(this, getString(R.string.update_install_failed));
+        }
+    }
+
+    private void openInstallPermission() {
+        try {
+            startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:" + getPackageName())));
+        } catch (Exception e) {
+            UiUtil.toast(this, getString(R.string.update_install_failed));
+        }
     }
 
     private void updateNotifyLabel() {
@@ -254,6 +399,7 @@ public class SettingsActivity extends Activity {
     private void confirmDelete(Endpoint e) {
         confirm(getString(R.string.dialog_delete_confirm), () -> {
             EndpointStore.delete(this, e);
+            if (e.id.equals(Prefs.selectedLine(this))) Prefs.setSelectedLine(this, "");
             endpoints = EndpointStore.load(this);
             render();
             changed = true;
@@ -313,6 +459,7 @@ public class SettingsActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        unregisterDownloadReceiver();
         ui.removeCallbacksAndMessages(null);
         scanPool.shutdownNow();
         super.onDestroy();

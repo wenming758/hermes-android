@@ -4,6 +4,7 @@ import android.Manifest;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -39,6 +40,8 @@ public class MainActivity extends Activity {
     private Button settingsBtn;
     private Button linesTopBtn;
     private TextView lineCount;
+    private View strategyBtn;
+    private TextView strategyName;
     private ImageView robot;
     private ImageView sparkleA;
     private ImageView sparkleB;
@@ -55,6 +58,7 @@ public class MainActivity extends Activity {
     private boolean pendingReprobe;
     private boolean autoOpened;
     private boolean showAdd;
+    private String pendingOpenId;
     private ObjectAnimator bob;
     private ObjectAnimator twinkleA;
     private ObjectAnimator twinkleB;
@@ -77,6 +81,8 @@ public class MainActivity extends Activity {
         settingsBtn = findViewById(R.id.settingsBtn);
         linesTopBtn = findViewById(R.id.linesTopBtn);
         lineCount = findViewById(R.id.lineCount);
+        strategyBtn = findViewById(R.id.strategyBtn);
+        strategyName = findViewById(R.id.strategyName);
         footer = findViewById(R.id.footer);
         robot = findViewById(R.id.robot);
         sparkleA = findViewById(R.id.sparkleA);
@@ -107,9 +113,22 @@ public class MainActivity extends Activity {
         content.animate().alpha(1f).setDuration(260).start();
 
         primaryBtn.setOnClickListener(v -> {
-            if (showAdd) {
+            Endpoint selected = selectedEndpoint();
+            if (showAdd && selected == null) {
                 openSettings();
-            } else if (bestReady != null) {
+                return;
+            }
+            if (selected != null) {
+                if (selected.state == Endpoint.STATE_READY
+                        || selected.state == Endpoint.STATE_NEEDS_LOGIN) {
+                    onEndpointTap(selected);
+                } else if (!probing) {
+                    pendingOpenId = selected.id;
+                    probeAll();
+                }
+                return;
+            }
+            if (bestReady != null) {
                 openEndpoint(bestReady);
             } else if (bestLogin != null) {
                 startLogin(bestLogin);
@@ -123,8 +142,10 @@ public class MainActivity extends Activity {
         });
         settingsBtn.setOnClickListener(v -> openSettings());
         linesTopBtn.setOnClickListener(v -> openSettings());
+        strategyBtn.setOnClickListener(v -> showStrategyDialog());
 
         endpoints = EndpointStore.load(this);
+        reconcileSelection();
         footer.setText(getString(R.string.footer_format, BuildConfig.VERSION_NAME));
         render();
         if (endpoints.isEmpty()) {
@@ -148,6 +169,79 @@ public class MainActivity extends Activity {
 
     private void openSettings() {
         startActivityForResult(new Intent(this, SettingsActivity.class), REQ_SETTINGS);
+    }
+
+    private Endpoint selectedEndpoint() {
+        String id = Prefs.selectedLine(this);
+        if (id == null || id.isEmpty()) return null;
+        for (Endpoint e : endpoints) {
+            if (id.equals(e.id)) return e;
+        }
+        return null;
+    }
+
+    private Endpoint findById(String id) {
+        if (id == null) return null;
+        for (Endpoint e : endpoints) {
+            if (id.equals(e.id)) return e;
+        }
+        return null;
+    }
+
+    private void reconcileSelection() {
+        String id = Prefs.selectedLine(this);
+        if (id == null || id.isEmpty()) return;
+        if (findById(id) == null) Prefs.setSelectedLine(this, "");
+    }
+
+    private void showStrategyDialog() {
+        final List<Endpoint> list = new ArrayList<>(endpoints);
+        String[] names = new String[list.size() + 1];
+        names[0] = getString(R.string.strategy_auto);
+        String current = Prefs.selectedLine(this);
+        int checked = 0;
+        for (int i = 0; i < list.size(); i++) {
+            names[i + 1] = list.get(i).name;
+            if (list.get(i).id.equals(current)) checked = i + 1;
+        }
+        new AlertDialog.Builder(this, R.style.DialogTheme)
+                .setTitle(R.string.strategy_title)
+                .setSingleChoiceItems(names, checked, (dialog, which) -> {
+                    String label;
+                    if (which == 0) {
+                        Prefs.setSelectedLine(this, "");
+                        label = getString(R.string.strategy_auto_short);
+                    } else {
+                        Endpoint e = list.get(which - 1);
+                        Prefs.setSelectedLine(this, e.id);
+                        label = e.name;
+                    }
+                    dialog.dismiss();
+                    updateStrategyLabel();
+                    updatePrimaryForSelection();
+                    UiUtil.toast(this, getString(R.string.strategy_changed, label));
+                })
+                .show();
+    }
+
+    private void updateStrategyLabel() {
+        Endpoint selected = selectedEndpoint();
+        strategyName.setText(selected == null
+                ? getString(R.string.strategy_auto_short) : selected.name);
+    }
+
+    private void updatePrimaryForSelection() {
+        if (probing) return;
+        Endpoint selected = selectedEndpoint();
+        if (selected == null) return;
+        primaryBtn.setVisibility(View.VISIBLE);
+        if (selected.state == Endpoint.STATE_READY) {
+            primaryBtn.setText(R.string.btn_enter);
+        } else if (selected.state == Endpoint.STATE_NEEDS_LOGIN) {
+            primaryBtn.setText(R.string.btn_login_fnos);
+        } else {
+            primaryBtn.setText(R.string.btn_retry_line);
+        }
     }
 
     private void showEmptyState() {
@@ -183,6 +277,7 @@ public class MainActivity extends Activity {
         boolean changed = base != null && EndpointStore.mergeLan(this, base);
         if (changed) {
             endpoints = EndpointStore.load(this);
+            reconcileSelection();
             UiUtil.toast(this, getString(R.string.scan_added, base));
             if (probing) {
                 pendingReprobe = true;
@@ -281,6 +376,16 @@ public class MainActivity extends Activity {
             probeAll();
             return;
         }
+        Endpoint pendingTarget = findById(pendingOpenId);
+        pendingOpenId = null;
+        if (pendingTarget != null && pendingTarget.state == Endpoint.STATE_READY) {
+            openEndpoint(pendingTarget);
+            return;
+        }
+        if (pendingTarget != null && pendingTarget.state == Endpoint.STATE_NEEDS_LOGIN) {
+            startLogin(pendingTarget);
+            return;
+        }
         if (endpoints.isEmpty()) {
             showEmptyState();
             return;
@@ -294,9 +399,14 @@ public class MainActivity extends Activity {
             primaryBtn.setVisibility(View.VISIBLE);
             if (Prefs.autoConnect(this) && !autoOpened) {
                 autoOpened = true;
+                Endpoint chosen = selectedEndpoint();
+                final Endpoint autoTarget = chosen != null ? chosen : bestReady;
                 ui.postDelayed(() -> {
-                    if (!isFinishing() && bestReady != null) {
-                        openEndpoint(bestReady);
+                    if (isFinishing()) return;
+                    if (autoTarget.state == Endpoint.STATE_READY) {
+                        openEndpoint(autoTarget);
+                    } else if (autoTarget.state == Endpoint.STATE_NEEDS_LOGIN) {
+                        startLogin(autoTarget);
                     }
                 }, 700);
             }
@@ -317,6 +427,7 @@ public class MainActivity extends Activity {
             primaryBtn.setText(R.string.btn_add_line);
             primaryBtn.setVisibility(View.VISIBLE);
         }
+        updatePrimaryForSelection();
     }
 
     private void setStatus(String title, String sub, int dotRes, boolean progressVisible) {
@@ -330,6 +441,8 @@ public class MainActivity extends Activity {
         endpointList.removeAllViews();
         lineCount.setText(getString(R.string.lines_count, endpoints.size()));
         updateActionLabels(endpoints.isEmpty());
+        updateStrategyLabel();
+        Endpoint selected = selectedEndpoint();
         for (Endpoint e : endpoints) {
             View row = getLayoutInflater().inflate(R.layout.item_endpoint, endpointList, false);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
@@ -368,7 +481,8 @@ public class MainActivity extends Activity {
             }
 
             boolean best = e == bestReady && e.state == Endpoint.STATE_READY;
-            row.setBackgroundResource(best ? R.drawable.bg_row_best : R.drawable.bg_row);
+            row.setBackgroundResource(best || e == selected
+                    ? R.drawable.bg_row_best : R.drawable.bg_row);
             row.setOnClickListener(v -> onEndpointTap(e));
             endpointList.addView(row);
         }
@@ -492,6 +606,7 @@ public class MainActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQ_SETTINGS) {
             endpoints = EndpointStore.load(this);
+            reconcileSelection();
             render();
             if (resultCode == RESULT_OK) {
                 probeAll();

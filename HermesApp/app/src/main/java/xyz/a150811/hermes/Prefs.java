@@ -53,6 +53,14 @@ public final class Prefs {
         p(c).edit().putBoolean("notify_asked", v).apply();
     }
 
+    public static String selectedLine(Context c) {
+        return p(c).getString("selected_line", "");
+    }
+
+    public static void setSelectedLine(Context c, String id) {
+        p(c).edit().putString("selected_line", id == null ? "" : id).apply();
+    }
+
     public static void setFnosSession(Context c, boolean v) {
         p(c).edit().putBoolean("fnos_session", v).apply();
     }
