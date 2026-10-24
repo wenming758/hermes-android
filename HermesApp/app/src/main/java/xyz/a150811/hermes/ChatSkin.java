@@ -148,6 +148,8 @@ final class ChatSkin {
               }
               st.textContent=css;
 
+              setupVoice();
+
               if(window.__hermesNav){
                 window.__hermesNav.refresh();
                 return;
@@ -255,6 +257,98 @@ final class ChatSkin {
                 try{localStorage.setItem(KEY,topMode?'top':'left');}catch(e){}
                 apply();
               }};
+
+              function setupVoice(){
+                if(window.__hermesVoice){
+                  try{window.__hermesVoice.refresh();}catch(e){}
+                  return;
+                }
+                var insecure=!window.isSecureContext
+                  ||!navigator.mediaDevices
+                  ||typeof navigator.mediaDevices.getUserMedia!=='function';
+                if(!insecure){
+                  window.__hermesVoice={refresh:function(){},isMic:function(){return false;}};
+                  return;
+                }
+                var RE=/voice|dictat|speech|microphone|mic|record|listen|语音|听写|转写|话筒|麦克风|录音/i;
+                var SKIP=/engine|引擎|播放|speak|read|朗读|对话|conversation/i;
+                function composer(){
+                  return d.querySelector('[data-slot="composer-root"]')
+                    ||d.querySelector('[data-slot="composer-dock"]')
+                    ||d.querySelector('[data-slot="composer-surface"]')
+                    ||d.querySelector('[data-slot="composer-bounds"]');
+                }
+                function label(b){
+                  return ((b.getAttribute('aria-label')||'')+' '
+                    +(b.getAttribute('title')||'')+' '
+                    +(b.getAttribute('data-tooltip')||'')).trim();
+                }
+                function isMic(b){
+                  if(!b||b.tagName!=='BUTTON')return false;
+                  var anchor=b.closest?b.closest('[data-slot="fan-menu-anchor"]'):null;
+                  if(anchor&&b.getAttribute('aria-haspopup')==='true')return true;
+                  var root=composer();
+                  if(root&&root.contains(b)){
+                    var l=label(b);
+                    if(l&&RE.test(l)&&!SKIP.test(l))return true;
+                    if(b.hasAttribute('aria-pressed')&&b.hasAttribute('data-active')
+                      &&!(b.textContent||'').trim())return true;
+                  }
+                  if(!root){
+                    var l2=label(b);
+                    if(l2&&RE.test(l2)&&!SKIP.test(l2)&&!(b.textContent||'').trim())return true;
+                  }
+                  return false;
+                }
+                function findMic(){
+                  var root=composer();
+                  if(root){
+                    var hub=root.querySelector('[data-slot="fan-menu-anchor"] button[aria-haspopup="true"]');
+                    if(hub)return hub;
+                    var bs=root.querySelectorAll('button');
+                    for(var i=0;i<bs.length;i++){
+                      var l=label(bs[i]);
+                      if(l&&RE.test(l)&&!SKIP.test(l))return bs[i];
+                    }
+                    var pa=root.querySelectorAll('button[aria-pressed][data-active]');
+                    for(var j=0;j<pa.length;j++){
+                      if(!(pa[j].textContent||'').trim())return pa[j];
+                    }
+                  }
+                  var all=d.querySelectorAll('button[aria-label]');
+                  for(var k=0;k<all.length;k++){
+                    var l2=label(all[k]);
+                    if(l2&&RE.test(l2)&&!SKIP.test(l2)&&!(all[k].textContent||'').trim())return all[k];
+                  }
+                  return null;
+                }
+                function unlock(){
+                  var m=findMic();
+                  if(!m)return;
+                  m.setAttribute('data-hermes-voice','1');
+                  if(m.disabled||m.getAttribute('aria-disabled')==='true'){
+                    try{m.disabled=false;}catch(e){}
+                    m.removeAttribute('disabled');
+                    m.setAttribute('aria-disabled','false');
+                  }
+                }
+                function click(e){
+                  var t=e.target;
+                  var b=t&&t.closest?t.closest('button'):null;
+                  if(!isMic(b))return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  try{e.stopImmediatePropagation();}catch(err){}
+                  try{
+                    if(window.HermesVoice&&window.HermesVoice.start)window.HermesVoice.start();
+                  }catch(err2){}
+                }
+                d.addEventListener('click',click,true);
+                window.__hermesVoice={refresh:unlock,isMic:isMic};
+                unlock();
+                setInterval(unlock,800);
+              }
+
               scan();
               setInterval(scan,1500);
               try{
@@ -273,6 +367,51 @@ final class ChatSkin {
     static String applyScript(boolean skin) {
         return JS.replace("__CSS__", JSONObject.quote(CSS))
                 .replace("__SKIN__", skin ? "true" : "false");
+    }
+
+    /** Types recognized speech into the live composer, then lets React flush it. */
+    static String insertTextScript(String text) {
+        return """
+                (function(t){
+                  try{
+                    var d=document;
+                    var el=d.querySelector('[data-slot="composer-rich-input"]');
+                    if(!el)el=d.querySelector('[data-slot="composer-surface"] [contenteditable="true"]');
+                    if(!el)el=d.querySelector('[data-slot="composer-surface"] textarea');
+                    if(!el)el=d.querySelector('textarea,[contenteditable="true"]');
+                    if(!el)return '0';
+                    el.focus();
+                    if(el.isContentEditable){
+                      var s=window.getSelection();
+                      if(!s.rangeCount||!el.contains(s.anchorNode)){
+                        var r=d.createRange();
+                        r.selectNodeContents(el);r.collapse(false);
+                        s.removeAllRanges();s.addRange(r);
+                      }
+                      var ok=false;
+                      try{ok=d.execCommand('insertText',false,t);}catch(e){}
+                      if(!ok){
+                        var r2=s.getRangeAt(0);
+                        r2.deleteContents();
+                        var n=d.createTextNode(t);
+                        r2.insertNode(n);
+                        r2.setStartAfter(n);r2.collapse(true);
+                        s.removeAllRanges();s.addRange(r2);
+                        try{el.dispatchEvent(new InputEvent('input',
+                          {bubbles:true,inputType:'insertText',data:t}));}
+                        catch(e2){el.dispatchEvent(new Event('input',{bubbles:true}));}
+                      }
+                    }else{
+                      var p=el.tagName==='TEXTAREA'
+                        ?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;
+                      var set=Object.getOwnPropertyDescriptor(p,'value').set;
+                      set.call(el,(el.value||'')+t);
+                      el.dispatchEvent(new Event('input',{bubbles:true}));
+                    }
+                    return '1';
+                  }catch(e3){return '0';}
+                })(__TEXT__)
+                """.replace("__TEXT__", JSONObject.quote(text));
     }
 
     static String removeScript() {

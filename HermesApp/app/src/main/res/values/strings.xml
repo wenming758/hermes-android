@@ -61,6 +61,11 @@
     <string name="menu_login">登录飞牛 / 捕获地址</string>
     <string name="menu_settings">设置</string>
     <string name="menu_nav_switch">切换导航栏位置（上/左）</string>
+    <string name="menu_voice_input">语音输入（系统识别）</string>
+    <string name="voice_prompt">请说话，识别后自动填到输入框</string>
+    <string name="voice_unavailable">未找到系统语音识别服务，请在系统设置里启用语音输入</string>
+    <string name="voice_no_result">没有识别到语音，请重试</string>
+    <string name="voice_insert_failed">识别成功，但没有写入输入框，请先点一下输入框再试</string>
     <string name="error_title">走丢了…</string>
     <string name="error_default">没能打开 Hermes，检查一下网络再试。</string>
     <string name="btn_retry">再试一次</string>

@@ -8,6 +8,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.ActivityNotFoundException;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
@@ -24,6 +25,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.os.SystemClock;
+import android.speech.RecognizerIntent;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
@@ -66,6 +68,7 @@ public class WebActivity extends Activity {
 
     private static final int REQ_FILE = 41;
     private static final int REQ_PERM = 42;
+    private static final int REQ_VOICE = 43;
 
     private WebView webView;
     private ProgressBar progress;
@@ -92,6 +95,7 @@ public class WebActivity extends Activity {
     private long pageStart;
     private ValueCallback<Uri[]> fileCallback;
     private PermissionRequest pendingPermission;
+    private boolean voiceActive;
     private BroadcastReceiver networkReceiver;
     private boolean receiverRegistered;
 
@@ -197,6 +201,7 @@ public class WebActivity extends Activity {
         webView.setWebViewClient(new Client());
         webView.setWebChromeClient(new Chrome());
         webView.setDownloadListener(this::handleDownload);
+        webView.addJavascriptInterface(new VoiceBridge(), "HermesVoice");
     }
 
     private void load(String url) {
@@ -418,6 +423,7 @@ public class WebActivity extends Activity {
         pm.getMenu().add(0, 5, 0, R.string.menu_settings);
         if (!captureMode) {
             pm.getMenu().add(0, 6, 1, R.string.menu_nav_switch);
+            pm.getMenu().add(0, 7, 2, R.string.menu_voice_input);
         }
         pm.setOnMenuItemClickListener(item -> {
             switch (item.getItemId()) {
@@ -441,6 +447,9 @@ public class WebActivity extends Activity {
                     webView.evaluateJavascript(
                             "(window.__hermesNav&&window.__hermesNav.toggle)"
                                     + "?window.__hermesNav.toggle():0", null);
+                    return true;
+                case 7:
+                    startVoiceInput();
                     return true;
                 default:
                     return false;
@@ -835,8 +844,74 @@ public class WebActivity extends Activity {
         }
     }
 
+    private class VoiceBridge {
+        @JavascriptInterface
+        public void start() {
+            runOnUiThread(WebActivity.this::startVoiceInput);
+        }
+    }
+
+    /**
+     * HTTP pages have no getUserMedia, so the web UI cannot record. Hand the
+     * mic over to the system recognizer and type the transcript into the
+     * composer instead of leaving the mic dead.
+     */
+    private void startVoiceInput() {
+        if (voiceActive) return;
+        Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        String lang = Locale.getDefault().toLanguageTag();
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang);
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang);
+        i.putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.voice_prompt));
+        i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+        i.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
+        try {
+            voiceActive = true;
+            startActivityForResult(i, REQ_VOICE);
+        } catch (ActivityNotFoundException e) {
+            voiceActive = false;
+            UiUtil.toast(this, getString(R.string.voice_unavailable));
+        } catch (Exception e) {
+            voiceActive = false;
+            UiUtil.toast(this, getString(R.string.voice_unavailable));
+        }
+    }
+
+    private void insertVoiceText(String text) {
+        if (webView == null) return;
+        webView.evaluateJavascript(ChatSkin.insertTextScript(text), value -> {
+            if (value == null || !value.contains("1")) {
+                UiUtil.toast(this, getString(R.string.voice_insert_failed));
+            }
+        });
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQ_VOICE) {
+            voiceActive = false;
+            if (resultCode == RESULT_OK && data != null) {
+                ArrayList<String> results =
+                        data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                String text = null;
+                if (results != null) {
+                    for (String r : results) {
+                        if (r != null && !r.trim().isEmpty()) {
+                            text = r.trim();
+                            break;
+                        }
+                    }
+                }
+                if (text == null) {
+                    UiUtil.toast(this, getString(R.string.voice_no_result));
+                } else {
+                    insertVoiceText(text);
+                }
+            }
+            return;
+        }
         if (requestCode == REQ_FILE) {
             if (fileCallback != null) {
                 Uri[] results = null;
@@ -1222,6 +1297,7 @@ public class WebActivity extends Activity {
         if (webView != null) {
             try {
                 webView.removeJavascriptInterface("HermesCapture");
+                webView.removeJavascriptInterface("HermesVoice");
                 webView.stopLoading();
                 webView.loadUrl("about:blank");
                 webView.setWebChromeClient(null);
