@@ -38,7 +38,9 @@ public class MainActivity extends Activity {
     private Button primaryBtn;
     private Button rescanBtn;
     private Button settingsBtn;
+    private Button updateBtn;
     private Button linesTopBtn;
+    private UpdateFlow updateFlow;
     private TextView lineCount;
     private View strategyBtn;
     private TextView strategyName;
@@ -79,6 +81,9 @@ public class MainActivity extends Activity {
         primaryBtn = findViewById(R.id.primaryBtn);
         rescanBtn = findViewById(R.id.rescanBtn);
         settingsBtn = findViewById(R.id.settingsBtn);
+        updateBtn = findViewById(R.id.updateBtn);
+        updateFlow = new UpdateFlow(this);
+        updateFlow.bind(updateBtn);
         linesTopBtn = findViewById(R.id.linesTopBtn);
         lineCount = findViewById(R.id.lineCount);
         strategyBtn = findViewById(R.id.strategyBtn);
@@ -602,6 +607,12 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        updateFlow.onResume();
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQ_SETTINGS) {
@@ -624,6 +635,7 @@ public class MainActivity extends Activity {
         if (bob != null) bob.cancel();
         if (twinkleA != null) twinkleA.cancel();
         if (twinkleB != null) twinkleB.cancel();
+        if (updateFlow != null) updateFlow.destroy();
         ui.removeCallbacksAndMessages(null);
         if (pool != null) pool.shutdownNow();
         if (scanPool != null) scanPool.shutdownNow();

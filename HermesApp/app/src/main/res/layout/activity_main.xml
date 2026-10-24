@@ -337,11 +337,41 @@
                 android:textSize="13sp" />
         </LinearLayout>
 
+        <Button
+            android:id="@+id/updateBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="9dp"
+            android:background="@drawable/bg_btn_secondary"
+            android:drawableStart="@drawable/ic_refresh"
+            android:drawablePadding="6dp"
+            android:drawableTint="@color/ink"
+            android:fontFamily="sans-serif-medium"
+            android:minHeight="48dp"
+            android:paddingStart="10dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="7dp"
+            android:stateListAnimator="@null"
+            android:text="@string/update_check"
+            android:textAllCaps="false"
+            android:textColor="@color/ink"
+            android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:text="@string/update_source_short"
+            android:textColor="@color/ink_soft"
+            android:textSize="10sp" />
+
         <TextView
             android:id="@+id/footer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="22dp"
+            android:layout_marginTop="14dp"
             android:gravity="center"
             android:textColor="@color/ink_soft"
             android:textSize="11sp" />
