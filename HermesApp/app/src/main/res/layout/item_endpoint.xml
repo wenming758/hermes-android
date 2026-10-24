@@ -75,6 +75,7 @@
     </LinearLayout>
 
     <ImageView
+        android:id="@+id/rowIcon"
         android:layout_width="18dp"
         android:layout_height="18dp"
         android:layout_marginStart="4dp"

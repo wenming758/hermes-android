@@ -61,6 +61,7 @@ public class MainActivity extends Activity {
     private boolean autoOpened;
     private boolean showAdd;
     private String pendingOpenId;
+    private Runnable autoOpenRunnable;
     private ObjectAnimator bob;
     private ObjectAnimator twinkleA;
     private ObjectAnimator twinkleB;
@@ -124,9 +125,10 @@ public class MainActivity extends Activity {
                 return;
             }
             if (selected != null) {
-                if (selected.state == Endpoint.STATE_READY
-                        || selected.state == Endpoint.STATE_NEEDS_LOGIN) {
-                    onEndpointTap(selected);
+                if (selected.state == Endpoint.STATE_READY) {
+                    openEndpoint(selected);
+                } else if (selected.state == Endpoint.STATE_NEEDS_LOGIN) {
+                    startLogin(selected);
                 } else if (!probing) {
                     pendingOpenId = selected.id;
                     probeAll();
@@ -406,14 +408,16 @@ public class MainActivity extends Activity {
                 autoOpened = true;
                 Endpoint chosen = selectedEndpoint();
                 final Endpoint autoTarget = chosen != null ? chosen : bestReady;
-                ui.postDelayed(() -> {
+                autoOpenRunnable = () -> {
                     if (isFinishing()) return;
+                    autoOpenRunnable = null;
                     if (autoTarget.state == Endpoint.STATE_READY) {
                         openEndpoint(autoTarget);
                     } else if (autoTarget.state == Endpoint.STATE_NEEDS_LOGIN) {
                         startLogin(autoTarget);
                     }
-                }, 700);
+                };
+                ui.postDelayed(autoOpenRunnable, 700);
             }
         } else if (bestLogin != null) {
             showAdd = false;
@@ -433,6 +437,13 @@ public class MainActivity extends Activity {
             primaryBtn.setVisibility(View.VISIBLE);
         }
         updatePrimaryForSelection();
+    }
+
+    private void cancelAutoOpen() {
+        if (autoOpenRunnable != null) {
+            ui.removeCallbacks(autoOpenRunnable);
+            autoOpenRunnable = null;
+        }
     }
 
     private void setStatus(String title, String sub, int dotRes, boolean progressVisible) {
@@ -486,9 +497,12 @@ public class MainActivity extends Activity {
             }
 
             boolean best = e == bestReady && e.state == Endpoint.STATE_READY;
-            row.setBackgroundResource(best || e == selected
-                    ? R.drawable.bg_row_best : R.drawable.bg_row);
-            row.setOnClickListener(v -> onEndpointTap(e));
+            row.setBackgroundResource(e == selected ? R.drawable.bg_row_selected
+                    : best ? R.drawable.bg_row_best : R.drawable.bg_row);
+            ImageView icon = row.findViewById(R.id.rowIcon);
+            icon.setImageResource(e == selected ? R.drawable.ic_check : R.drawable.ic_chevron);
+            icon.setAlpha(e == selected ? 1f : 0.65f);
+            row.setOnClickListener(v -> selectEndpoint(e));
             endpointList.addView(row);
         }
     }
@@ -559,25 +573,13 @@ public class MainActivity extends Activity {
         return R.drawable.bg_pill_soft;
     }
 
-    private void onEndpointTap(Endpoint e) {
-        switch (e.state) {
-            case Endpoint.STATE_READY:
-            case Endpoint.STATE_IDLE:
-                openEndpoint(e);
-                break;
-            case Endpoint.STATE_NEEDS_LOGIN:
-                startLogin(e);
-                break;
-            case Endpoint.STATE_PROBING:
-                UiUtil.toast(this, getString(R.string.toast_probing));
-                break;
-            case Endpoint.STATE_FAIL:
-                UiUtil.toast(this, e.detail == null || e.detail.isEmpty()
-                        ? getString(R.string.state_fail) : e.detail);
-                break;
-            default:
-                break;
-        }
+    /** Tap = pick only: highlight the row and arm the enter button; never opens directly. */
+    private void selectEndpoint(Endpoint e) {
+        Prefs.setSelectedLine(this, e.id);
+        autoOpened = true;
+        cancelAutoOpen();
+        render();
+        updatePrimaryForSelection();
     }
 
     private void openEndpoint(Endpoint e) {
