@@ -5,6 +5,9 @@
 
 App 不内置任何固定网址：启动时自动扫描局域网里的飞牛网关，外网线路由用户自己添加。
 
+[下载 APK](https://github.com/wenming758/hermes-android/releases/latest) ｜
+[源码仓库](https://github.com/wenming758/hermes-android)
+
 ## 功能
 
 - **局域网自动发现**：启动时并发扫描当前 /24 网段的 5666 端口，识别 `飞牛 fnOS`
