@@ -60,6 +60,7 @@
     <string name="menu_browser">用系统浏览器打开</string>
     <string name="menu_login">登录飞牛 / 捕获地址</string>
     <string name="menu_settings">设置</string>
+    <string name="menu_nav_switch">切换导航栏位置（上/左）</string>
     <string name="error_title">走丢了…</string>
     <string name="error_default">没能打开 Hermes，检查一下网络再试。</string>
     <string name="btn_retry">再试一次</string>

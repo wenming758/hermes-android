@@ -416,6 +416,9 @@ public class WebActivity extends Activity {
         pm.getMenu().add(0, 3, 0, R.string.menu_browser);
         pm.getMenu().add(0, 4, 0, R.string.menu_login);
         pm.getMenu().add(0, 5, 0, R.string.menu_settings);
+        if (!captureMode) {
+            pm.getMenu().add(0, 6, 1, R.string.menu_nav_switch);
+        }
         pm.setOnMenuItemClickListener(item -> {
             switch (item.getItemId()) {
                 case 1:
@@ -433,6 +436,11 @@ public class WebActivity extends Activity {
                     return true;
                 case 5:
                     startActivity(new Intent(this, SettingsActivity.class));
+                    return true;
+                case 6:
+                    webView.evaluateJavascript(
+                            "(window.__hermesNav&&window.__hermesNav.toggle)"
+                                    + "?window.__hermesNav.toggle():0", null);
                     return true;
                 default:
                     return false;
@@ -550,8 +558,7 @@ public class WebActivity extends Activity {
         if (webView == null || captureMode) return;
         skinOn = Prefs.wechatSkin(this);
         try {
-            webView.evaluateJavascript(
-                    skinOn ? ChatSkin.applyScript() : ChatSkin.removeScript(), null);
+            webView.evaluateJavascript(ChatSkin.applyScript(skinOn), null);
         } catch (Exception ignored) {
         }
     }
