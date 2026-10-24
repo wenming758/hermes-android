@@ -42,6 +42,15 @@ public final class Doh {
     }
 
     public static synchronized String resolveIpv6(String host) {
+        return resolve(host, false);
+    }
+
+    /** Re-resolves via public DNS, ignoring both system DNS and the local cache. */
+    public static synchronized String resolveIpv6Fresh(String host) {
+        return resolve(host, true);
+    }
+
+    private static String resolve(String host, boolean preferPublic) {
         if (host == null) return null;
         host = host.trim();
         if (host.startsWith("[") && host.endsWith("]")) {
@@ -51,12 +60,21 @@ public final class Doh {
         if (host.indexOf(':') >= 0) return host;
 
         long now = System.currentTimeMillis();
-        Entry c = CACHE.get(host);
-        if (c != null && now - c.at < c.ttl) return c.addr;
+        if (!preferPublic) {
+            Entry c = CACHE.get(host);
+            if (c != null && now - c.at < c.ttl) return c.addr;
+        }
 
-        String addr = system(host);
-        if (addr == null) addr = udp(host);
-        if (addr == null) addr = doh(host);
+        String addr;
+        if (preferPublic) {
+            addr = udp(host);
+            if (addr == null) addr = doh(host);
+            if (addr == null) addr = system(host);
+        } else {
+            addr = system(host);
+            if (addr == null) addr = udp(host);
+            if (addr == null) addr = doh(host);
+        }
 
         Entry e = new Entry();
         e.addr = addr;

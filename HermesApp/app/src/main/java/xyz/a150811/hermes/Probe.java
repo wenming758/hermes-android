@@ -315,15 +315,15 @@ public final class Probe {
     }
 
     /**
-     * Fetches a URL, and when the phone's DNS cannot resolve the host,
-     * resolves AAAA over DoH/UDP and retries the same request against the
-     * IPv6 literal. The literal base is returned through baseOut[0].
+     * Fetches a URL. When the hostname cannot be resolved, or the returned
+     * address no longer answers (stale AAAA after an IPv6 prefix change),
+     * re-resolves via public DNS and retries against the IPv6 literal.
+     * The literal base is returned through baseOut[0].
      */
     private static Http fetchSmart(String url, int connectMs, int readMs, String[] baseOut) {
         if (baseOut != null) baseOut[0] = baseOf(url);
         Http h = fetch(url, connectMs, readMs);
         if (h.error == null || baseOut == null) return h;
-        if (!"域名解析失败".equals(h.error)) return h;
 
         Uri u = Uri.parse(url);
         String host = u.getHost();
@@ -337,9 +337,10 @@ public final class Probe {
             return h;
         }
 
-        String addr = Doh.resolveIpv6(host);
+        boolean dnsFailed = "域名解析失败".equals(h.error);
+        String addr = dnsFailed ? Doh.resolveIpv6(host) : Doh.resolveIpv6Fresh(host);
         if (addr == null) {
-            h.error = "解析不到 IPv6 地址";
+            if (dnsFailed) h.error = "解析不到 IPv6 地址";
             return h;
         }
 
