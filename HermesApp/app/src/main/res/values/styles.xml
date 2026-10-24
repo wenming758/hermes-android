@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">@color/ink</item>
+        <item name="android:colorPrimaryDark">@color/cream</item>
+        <item name="android:colorAccent">@color/pink</item>
+        <item name="android:windowBackground">@drawable/bg_app</item>
+        <item name="android:statusBarColor">@color/cream</item>
+        <item name="android:navigationBarColor">@color/cream</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorControlActivated">@color/pink</item>
+        <item name="android:colorControlHighlight">#33FF8FA8</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+
+    <style name="DialogTheme" parent="@android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:colorAccent">@color/pink</item>
+        <item name="android:windowBackground">@drawable/bg_dialog</item>
+    </style>
+</resources>

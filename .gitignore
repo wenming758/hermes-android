@@ -1,0 +1,31 @@
+# Android / Gradle 构建产物
+.gradle/
+build/
+HermesApp/.gradle/
+HermesApp/build/
+HermesApp/app/build/
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# 签名文件与密码（绝不入库）
+*.jks
+*.keystore
+HermesApp/hermes-release.jks
+HermesApp/keystore.properties
+
+# 安装包走 Release 附件，不入库
+*.apk
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 本地需求备忘（含个人网络信息）
+说明.txt
+
+# Python 缓存
+__pycache__/
+*.pyc
