@@ -89,6 +89,8 @@
     <string name="settings_connect">连接</string>
     <string name="settings_auto">自动进入最快线路</string>
     <string name="settings_desktop">桌面版网页（大屏排版）</string>
+    <string name="settings_wechat">微信风格对话</string>
+    <string name="settings_wechat_hint">对话页改为灰底、右侧绿色自己、左侧白色 AI，关闭后恢复 Hermes 原界面。</string>
     <string name="settings_keep_on">对话时保持屏幕常亮</string>
     <string name="settings_immersive">对话时隐藏底部导航栏（全屏）</string>
     <string name="settings_notify_on">通知权限：已开启（点按管理）</string>

@@ -29,6 +29,14 @@ public final class Prefs {
         p(c).edit().putBoolean("desktop_ua", v).apply();
     }
 
+    public static boolean wechatSkin(Context c) {
+        return p(c).getBoolean("wechat_skin", true);
+    }
+
+    public static void setWechatSkin(Context c, boolean v) {
+        p(c).edit().putBoolean("wechat_skin", v).apply();
+    }
+
     public static boolean keepScreenOn(Context c) {
         return p(c).getBoolean("keep_screen_on", false);
     }

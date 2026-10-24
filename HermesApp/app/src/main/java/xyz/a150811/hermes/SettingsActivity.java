@@ -58,6 +58,7 @@ public class SettingsActivity extends Activity {
         Switch desktop = findViewById(R.id.switchDesktop);
         Switch keepOn = findViewById(R.id.switchKeepOn);
         Switch immersive = findViewById(R.id.switchImmersive);
+        Switch wechat = findViewById(R.id.switchWechat);
         notifyBtn = findViewById(R.id.notifyBtn);
         notifyBtn.setOnClickListener(v -> openNotifySettings());
         updateBtn = findViewById(R.id.updateBtn);
@@ -68,6 +69,7 @@ public class SettingsActivity extends Activity {
         desktop.setChecked(Prefs.desktopUa(this));
         keepOn.setChecked(Prefs.keepScreenOn(this));
         immersive.setChecked(Prefs.immersive(this));
+        wechat.setChecked(Prefs.wechatSkin(this));
 
         auto.setOnCheckedChangeListener((b, v) -> {
             Prefs.setAutoConnect(this, v);
@@ -83,6 +85,10 @@ public class SettingsActivity extends Activity {
         });
         immersive.setOnCheckedChangeListener((b, v) -> {
             Prefs.setImmersive(this, v);
+            changed = true;
+        });
+        wechat.setOnCheckedChangeListener((b, v) -> {
+            Prefs.setWechatSkin(this, v);
             changed = true;
         });
 

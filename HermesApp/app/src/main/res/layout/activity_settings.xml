@@ -82,6 +82,24 @@
                 android:textSize="14sp" />
 
             <Switch
+                android:id="@+id/switchWechat"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:text="@string/settings_wechat"
+                android:textColor="@color/ink"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="6dp"
+                android:text="@string/settings_wechat_hint"
+                android:textColor="@color/ink_soft"
+                android:textSize="11sp" />
+
+            <Switch
                 android:id="@+id/switchKeepOn"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

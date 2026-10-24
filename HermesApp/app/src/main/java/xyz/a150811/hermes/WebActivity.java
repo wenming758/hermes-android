@@ -88,6 +88,7 @@ public class WebActivity extends Activity {
     private boolean captured;
     private boolean bridgeAdded;
     private boolean tokenDialogShown;
+    private boolean skinOn;
     private long pageStart;
     private ValueCallback<Uri[]> fileCallback;
     private PermissionRequest pendingPermission;
@@ -545,6 +546,16 @@ public class WebActivity extends Activity {
         loginBtn.setVisibility(captureMode ? View.GONE : View.VISIBLE);
     }
 
+    private void applyChatSkin() {
+        if (webView == null || captureMode) return;
+        skinOn = Prefs.wechatSkin(this);
+        try {
+            webView.evaluateJavascript(
+                    skinOn ? ChatSkin.applyScript() : ChatSkin.removeScript(), null);
+        } catch (Exception ignored) {
+        }
+    }
+
     private void checkInvalidToken() {
         if (tokenDialogShown) return;
         webView.evaluateJavascript(
@@ -638,6 +649,7 @@ public class WebActivity extends Activity {
             statusView.setText(getString(R.string.web_connected, ms));
             badHealthChecks = 0;
             checkInvalidToken();
+            applyChatSkin();
         }
 
         @Override
@@ -1128,6 +1140,9 @@ public class WebActivity extends Activity {
         pausedAt = 0;
         if (!captureMode) {
             scheduleHealth(away > 15000 ? 800 : 12000);
+            if (Prefs.wechatSkin(this) != skinOn) {
+                applyChatSkin();
+            }
         }
     }
 
