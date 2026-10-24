@@ -125,6 +125,17 @@
     <string name="update_notes_empty">包含最新修复与改进，详见 GitHub Releases。</string>
     <string name="update_source">更新源：https://github.com/wenming758/hermes-android/releases</string>
     <string name="update_source_short">更新源 github.com/wenming758/hermes-android</string>
+    <string name="update_progress_title">正在下载 v%s</string>
+    <string name="update_progress_cancel">取消</string>
+    <string name="update_progress_mb">%1$s / %2$s（%3$d%%）</string>
+    <string name="update_progress_bytes">已下载 %s</string>
+    <string name="update_progress_retry">网络不稳定，正在断点续传（第 %1$d 次，已下载 %2$s）</string>
+    <string name="update_download_error_title">下载中断</string>
+    <string name="update_download_error_msg">%s\n已下载的部分会保留，点「继续下载」从断点接着传。</string>
+    <string name="update_download_retry">继续下载</string>
+    <string name="update_installing">正在准备安装…</string>
+    <string name="update_install_done">升级完成</string>
+    <string name="update_install_error">安装未完成（状态 %1$d），可重新检测更新后再试</string>
     <string name="settings_lines">线路</string>
     <string name="settings_add">添加</string>
     <string name="settings_line_hint">点按编辑，长按删除。局域网可自动扫描；外网地址手动添加，支持 IPv6 字面量，例如 http://[240e:…]:5666/</string>
