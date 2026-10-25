@@ -618,17 +618,54 @@ public class MainActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQ_SETTINGS) {
-            endpoints = EndpointStore.load(this);
-            reconcileSelection();
-            render();
             if (resultCode == RESULT_OK) {
+                endpoints = EndpointStore.load(this);
+                reconcileSelection();
                 probeAll();
-            } else if (endpoints.isEmpty()) {
+            } else {
+                mergeStore();
+            }
+            if (endpoints.isEmpty()) {
                 showEmptyState();
             }
         } else if (requestCode == REQ_WEB) {
-            endpoints = EndpointStore.load(this);
+            mergeStore();
+        }
+    }
+
+    /** Refreshes persisted fields into the live endpoints instead of
+     *  reloading the store wholesale — a reload resets every line to its
+     *  idle state after coming back from chat or settings. Lines actually
+     *  added or removed still trigger a fresh probe. */
+    private void mergeStore() {
+        List<Endpoint> fresh = EndpointStore.load(this);
+        boolean same = fresh.size() == endpoints.size();
+        if (same) {
+            for (Endpoint f : fresh) {
+                Endpoint live = findById(f.id);
+                if (live == null) {
+                    same = false;
+                    break;
+                }
+                live.name = f.name;
+                live.url = f.url;
+                live.kind = f.kind;
+                live.path = f.path;
+                live.resolvedBase = f.resolvedBase;
+            }
+        }
+        if (same) {
+            reconcileSelection();
             render();
+            return;
+        }
+        endpoints = fresh;
+        reconcileSelection();
+        if (probing) {
+            pendingReprobe = true;
+        } else {
+            render();
+            probeAll();
         }
     }
 
