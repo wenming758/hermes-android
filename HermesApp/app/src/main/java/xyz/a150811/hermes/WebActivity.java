@@ -210,6 +210,7 @@ public class WebActivity extends Activity {
             return;
         }
         lastUrl = url;
+        CookieStore.restore(this, url);
         tokenDialogShown = false;
         errorOverlay.setVisibility(View.GONE);
         statusView.setText(R.string.web_connecting);
@@ -1238,6 +1239,7 @@ public class WebActivity extends Activity {
         // must keep running while minimized, or unfinished Hermes tasks stall.
         // The foreground service keeps the process out of vendor freeze lists.
         KeepAliveService.start(this);
+        saveCookies();
         unregisterNetwork();
         super.onPause();
     }
@@ -1292,8 +1294,23 @@ public class WebActivity extends Activity {
         }
     }
 
+    /** Dumps the login cookies of every known origin to disk before the
+     *  process may die (lock screen, swipe away); CookieStore re-injects
+     *  them on the next launch so no re-login is needed. */
+    private void saveCookies() {
+        CookieStore.save(this, lastUrl);
+        if (loginBase != null) {
+            CookieStore.save(this, loginBase);
+        }
+        for (Endpoint e : EndpointStore.load(this)) {
+            CookieStore.save(this, e.launchUrl());
+        }
+        CookieManager.getInstance().flush();
+    }
+
     @Override
     protected void onDestroy() {
+        saveCookies();
         KeepAliveService.stop(this);
         unregisterNetwork();
         ui.removeCallbacksAndMessages(null);

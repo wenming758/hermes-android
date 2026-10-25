@@ -505,6 +505,11 @@ public final class Probe {
                     "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8");
             conn.setRequestProperty("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.6");
             String cookie = CookieManager.getInstance().getCookie(url);
+            if ((cookie == null || cookie.isEmpty()) && App.get() != null) {
+                // Session cookies die with the process; the disk backup may
+                // still hold the login the WebView has not re-established.
+                cookie = CookieStore.saved(App.get(), url);
+            }
             if (cookie != null && !cookie.isEmpty()) {
                 conn.setRequestProperty("Cookie", cookie);
             }

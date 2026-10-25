@@ -106,6 +106,7 @@ public class SettingsActivity extends Activity {
             CookieManager.getInstance().removeAllCookies(null);
             CookieManager.getInstance().flush();
             WebStorage.getInstance().deleteAllData();
+            CookieStore.clear(this);
             Prefs.setFnosSession(this, false);
             UiUtil.toast(this, getString(R.string.settings_clear_done));
         }));
