@@ -136,6 +136,8 @@
     <string name="update_installing">正在准备安装…</string>
     <string name="update_install_done">升级完成</string>
     <string name="update_install_error">安装未完成（状态 %1$d），可重新检测更新后再试</string>
+    <string name="keepalive_title">Hermes 任务运行中</string>
+    <string name="keepalive_text">任务正在后台保持运行，点按回到应用</string>
     <string name="settings_lines">线路</string>
     <string name="settings_add">添加</string>
     <string name="settings_line_hint">点按编辑，长按删除。局域网可自动扫描；外网地址手动添加，支持 IPv6 字面量，例如 http://[240e:…]:5666/</string>

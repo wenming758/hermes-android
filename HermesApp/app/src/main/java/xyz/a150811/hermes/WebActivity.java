@@ -1217,6 +1217,7 @@ public class WebActivity extends Activity {
             UiUtil.applyImmersiveNav(this);
         }
         webView.onResume();
+        KeepAliveService.stop(this);
         registerNetwork();
         long away = pausedAt > 0 ? SystemClock.elapsedRealtime() - pausedAt : 0;
         pausedAt = 0;
@@ -1233,7 +1234,10 @@ public class WebActivity extends Activity {
         resumed = false;
         pausedAt = SystemClock.elapsedRealtime();
         ui.removeCallbacks(healthTask);
-        webView.onPause();
+        // Deliberately NOT calling webView.onPause(): page JS, timers and DOM
+        // must keep running while minimized, or unfinished Hermes tasks stall.
+        // The foreground service keeps the process out of vendor freeze lists.
+        KeepAliveService.start(this);
         unregisterNetwork();
         super.onPause();
     }
@@ -1290,6 +1294,7 @@ public class WebActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        KeepAliveService.stop(this);
         unregisterNetwork();
         ui.removeCallbacksAndMessages(null);
         if (netPool != null) netPool.shutdownNow();

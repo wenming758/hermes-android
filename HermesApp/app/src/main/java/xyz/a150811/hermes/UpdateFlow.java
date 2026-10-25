@@ -99,6 +99,7 @@ public final class UpdateFlow {
             return;
         }
         busy = true;
+        KeepAliveService.start(activity);
         File dir = new File(activity.getFilesDir(), "update");
         dir.mkdirs();
         cleanupOld(dir, release.version);
@@ -133,12 +134,14 @@ public final class UpdateFlow {
 
                     @Override
                     public void onDone() {
+                        KeepAliveService.stop(activity);
                         hideProgressDialog();
                         installSession(target);
                     }
 
                     @Override
                     public void onError(String message) {
+                        KeepAliveService.stop(activity);
                         hideProgressDialog();
                         resetButton();
                         if (activity.isFinishing() || activity.isDestroyed()) return;
@@ -200,6 +203,7 @@ public final class UpdateFlow {
 
     private void cancelDownload() {
         if (downloader != null) downloader.cancel();
+        KeepAliveService.stop(activity);
         busy = false;
         resetButton();
     }
@@ -272,6 +276,7 @@ public final class UpdateFlow {
 
     public void destroy() {
         if (downloader != null) downloader.cancel();
+        KeepAliveService.stop(activity);
         hideProgressDialog();
     }
 
