@@ -51,6 +51,23 @@ Gitee 不通时自动回落到 GitHub Releases。
   SSL 证书错误阻断、断网恢复后自动重试。
 - **卡通界面**：机器人首页、贴纸按钮、彩色状态胶囊、星光动画。
 
+## 界面截图
+
+| 首页 · 状态与线路 | 线路列表 · 探测结果与操作 |
+| --- | --- |
+| ![首页](screenshots/01-home.jpg) | ![线路](screenshots/02-home-lines.jpg) |
+
+| 线路策略 | 设置 |
+| --- | --- |
+| ![策略](screenshots/03-strategy.jpg) | ![设置](screenshots/04-settings.jpg) |
+
+| 添加线路 | 登录飞牛（内嵌网页） |
+| --- | --- |
+| ![添加线路](screenshots/05-add-line.jpg) | ![登录](screenshots/06-web-login.jpg) |
+
+截图为横屏平板分辨率下的真机渲染（MuMu 模拟器 + 局域网内的真实飞牛 NAS），
+手机竖屏下同一套界面会自动按竖排布局显示。
+
 ## 1.1.4 更新
 
 - **登录返回自动刷新**：重新探测 → 选中线路 → 登录飞牛 → 返回首页后，
