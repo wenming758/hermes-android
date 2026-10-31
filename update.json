@@ -1,0 +1,9 @@
+{
+  "version": "1.1.4",
+  "file": "Hermes-1.1.4.apk",
+  "apk": "https://gitee.com/wenming760/hermes-android/raw/master/Hermes-1.1.4.apk",
+  "size": 348048,
+  "sha256": "bbb1b814eb537b5481fdfbef388a30480fca4b4d90e450de3fe8462f765f2941",
+  "github": "https://github.com/wenming758/hermes-android/releases/download/v1.1.4/Hermes-1.1.4.apk",
+  "body": "登录或聊天返回后自动重新探测，线路状态即时刷新；应用内升级源改为 Gitee 同步源（GitHub Releases 为镜像兜底），国内下载更快更稳。"
+}

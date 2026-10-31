@@ -5,8 +5,11 @@
 
 App 不内置任何固定网址：启动时自动扫描局域网里的飞牛网关，外网线路由用户自己添加。
 
-[下载 APK](https://github.com/wenming758/hermes-android/releases/latest) ｜
-[源码仓库](https://github.com/wenming758/hermes-android)
+[下载 APK（Gitee，国内快）](https://gitee.com/wenming760/hermes-android/releases) ｜
+[下载 APK（GitHub Releases）](https://github.com/wenming758/hermes-android/releases/latest)
+
+应用内“检测更新”默认读取 Gitee 同步源的 `update.json`（更新清单就在仓库根目录），
+Gitee 不通时自动回落到 GitHub Releases。
 
 ## 功能
 
@@ -17,7 +20,8 @@ App 不内置任何固定网址：启动时自动扫描局域网里的飞牛网�
 - **点选线路不进入**：点线路列表中的任意一条只会选中并高亮（蓝色描边 + 对勾），
   不会直接进入；必须点“进入 Hermes”按钮才按所选线路进入。未选择线路时自动用最快线路。
 - **线路策略**：首页“当前策略”也可指定“自动选最快”或某一条线路；选好后点“进入 Hermes”即按该线路进入。
-- **在线升级**：首页和设置页都有“检测更新”按钮，直接读取 GitHub Releases，
+- **在线升级**：首页和设置页都有“检测更新”按钮，优先读取 Gitee 同步源的
+  `update.json`，Gitee 不通自动回落 GitHub Releases，
   显示更新说明与更新源。应用内下载：进度条实时显示百分比和大小，网络卡住自动
   断线重连、断点续传（最多 6 次），下载完成自动调起安装，点一次“更新”即完成
   升级并重启，无需手动找 APK 重装。
@@ -46,6 +50,17 @@ App 不内置任何固定网址：启动时自动扫描局域网里的飞牛网�
 - **完整网页能力**：下载、文件上传、麦克风/摄像头授权、JS 弹窗、`window.open` 小窗、
   SSL 证书错误阻断、断网恢复后自动重试。
 - **卡通界面**：机器人首页、贴纸按钮、彩色状态胶囊、星光动画。
+
+## 1.1.4 更新
+
+- **登录返回自动刷新**：重新探测 → 选中线路 → 登录飞牛 → 返回首页后，
+  不再需要手动点“重新探测”。现在返回时自动重新探测，线路状态立刻从
+  “需登录”变成“已就绪”。从聊天页、设置页返回同样会刷新，并且不会
+  自动跳转进聊天页，只更新状态。
+- **升级源改为 Gitee 同步源**：应用内“检测更新”先读
+  `gitee.com/wenming760/hermes-android/raw/master/update.json`，
+  国内网络下载 APK 更快更稳；Gitee 不通时自动回落到 GitHub Releases，
+  更新对话框与“关于”里都会标明当前更新源。
 
 ## 1.1.3 更新
 

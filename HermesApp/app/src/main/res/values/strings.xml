@@ -123,8 +123,8 @@
     <string name="update_allow_msg">请允许 Hermes 安装更新，然后返回继续安装。</string>
     <string name="update_allow_go">去允许</string>
     <string name="update_notes_empty">包含最新修复与改进，详见 GitHub Releases。</string>
-    <string name="update_source">更新源：https://github.com/wenming758/hermes-android/releases</string>
-    <string name="update_source_short">更新源 github.com/wenming758/hermes-android</string>
+    <string name="update_source">更新源：https://gitee.com/wenming760/hermes-android（GitHub 镜像：wenming758/hermes-android）</string>
+    <string name="update_source_short">更新源 gitee.com/wenming760/hermes-android</string>
     <string name="update_progress_title">正在下载 v%s</string>
     <string name="update_progress_cancel">取消</string>
     <string name="update_progress_mb">%1$s / %2$s（%3$d%%）</string>
@@ -149,7 +149,7 @@
     <string name="settings_clear_confirm">将清除所有网页登录状态和缓存，确定吗？</string>
     <string name="settings_clear_done">已清除登录状态</string>
     <string name="settings_about">关于</string>
-    <string name="settings_about_body">Hermes 安卓版 v%s\n原生外壳 + 内嵌 Hermes 界面，所有对话直连你的飞牛 NAS，不经过微信或第三方服务器。\n\n首次启动会自动扫描局域网里的飞牛网关；外网线路在“线路”里手动添加，支持 IPv6 字面量。\n\n更新源：github.com/wenming758/hermes-android</string>
+    <string name="settings_about_body">Hermes 安卓版 v%s\n原生外壳 + 内嵌 Hermes 界面，所有对话直连你的飞牛 NAS，不经过微信或第三方服务器。\n\n首次启动会自动扫描局域网里的飞牛网关；外网线路在“线路”里手动添加，支持 IPv6 字面量。\n\n更新源：gitee.com/wenming760/hermes-android（GitHub 镜像 wenming758/hermes-android）</string>
     <string name="settings_saved">已保存</string>
 
     <string name="dialog_add_title">添加线路</string>

@@ -58,6 +58,7 @@ public class MainActivity extends Activity {
     private boolean probing;
     private boolean scanning;
     private boolean pendingReprobe;
+    private boolean pendingReprobeAutoOpen = true;
     private boolean autoOpened;
     private boolean showAdd;
     private String pendingOpenId;
@@ -306,13 +307,17 @@ public class MainActivity extends Activity {
     }
 
     private void probeAll() {
+        probeAll(true);
+    }
+
+    private void probeAll(boolean allowAutoOpen) {
         if (probing) return;
         if (endpoints.isEmpty()) {
             showEmptyState();
             return;
         }
         probing = true;
-        autoOpened = false;
+        autoOpened = !allowAutoOpen;
         showAdd = false;
         bestReady = null;
         bestLogin = null;
@@ -380,7 +385,8 @@ public class MainActivity extends Activity {
         render();
         if (pendingReprobe) {
             pendingReprobe = false;
-            probeAll();
+            probeAll(pendingReprobeAutoOpen);
+            pendingReprobeAutoOpen = true;
             return;
         }
         Endpoint pendingTarget = findById(pendingOpenId);
@@ -629,7 +635,10 @@ public class MainActivity extends Activity {
                 showEmptyState();
             }
         } else if (requestCode == REQ_WEB) {
-            mergeStore();
+            // Coming back from login or chat, cookies changed but the stored
+            // state still says 需登录 — re-probe so the card is truthful.
+            mergeStore(false);
+            if (!probing) probeAll(false);
         }
     }
 
@@ -638,6 +647,10 @@ public class MainActivity extends Activity {
      *  idle state after coming back from chat or settings. Lines actually
      *  added or removed still trigger a fresh probe. */
     private void mergeStore() {
+        mergeStore(true);
+    }
+
+    private void mergeStore(boolean allowAutoOpen) {
         List<Endpoint> fresh = EndpointStore.load(this);
         boolean same = fresh.size() == endpoints.size();
         if (same) {
@@ -663,9 +676,10 @@ public class MainActivity extends Activity {
         reconcileSelection();
         if (probing) {
             pendingReprobe = true;
+            pendingReprobeAutoOpen = allowAutoOpen;
         } else {
             render();
-            probeAll();
+            probeAll(allowAutoOpen);
         }
     }
 

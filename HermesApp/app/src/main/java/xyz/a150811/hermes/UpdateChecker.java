@@ -13,6 +13,10 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 public final class UpdateChecker {
+    /** Gitee is the in-app update source; GitHub stays as the mirror. */
+    private static final String GITEE_RAW =
+            "https://gitee.com/wenming760/hermes-android/raw/master/";
+    private static final String GITEE_MANIFEST = GITEE_RAW + "update.json";
     private static final String REPO = "wenming758/hermes-android";
     private static final String API = "https://api.github.com/repos/" + REPO + "/releases/latest";
     private static final String LATEST = "https://github.com/" + REPO + "/releases/latest";
@@ -43,19 +47,47 @@ public final class UpdateChecker {
             Release release = null;
             String error = null;
             try {
-                release = fetchFromApi();
-            } catch (Exception apiError) {
+                release = fetchFromGitee();
+            } catch (Exception giteeError) {
                 try {
-                    release = fetchFromRedirect();
-                } catch (Exception e) {
-                    error = apiError.getMessage();
-                    if (error == null || error.isEmpty()) error = e.toString();
+                    release = fetchFromApi();
+                } catch (Exception apiError) {
+                    try {
+                        release = fetchFromRedirect();
+                    } catch (Exception redirectError) {
+                        String m = giteeError.getMessage();
+                        if (m == null || m.isEmpty()) m = giteeError.toString();
+                        error = m + "（GitHub 镜像也不通）";
+                    }
                 }
             }
             final Release result = release;
             final String message = error;
             new Handler(Looper.getMainLooper()).post(() -> callback.onResult(result, message));
         }).start();
+    }
+
+    /** Reads the version manifest committed at the root of the Gitee repo. */
+    private static Release fetchFromGitee() throws Exception {
+        HttpURLConnection conn = open(GITEE_MANIFEST, "application/json, text/plain, */*");
+        try {
+            int code = conn.getResponseCode();
+            if (code != 200) throw new Exception("Gitee HTTP " + code);
+            JSONObject json = new JSONObject(read(conn.getInputStream()));
+            String version = stripV(json.optString("version", ""));
+            if (version.isEmpty()) throw new Exception("update.json 缺少 version");
+            String apk = json.optString("apk", "");
+            if (apk.isEmpty()) {
+                String file = json.optString("file", "");
+                if (!file.isEmpty()) apk = GITEE_RAW + file;
+            }
+            if (apk.isEmpty()) throw new Exception("update.json 缺少安装包地址");
+            if (!isNewer(version, BuildConfig.VERSION_NAME)) return null;
+            return new Release(version, json.optString("body", json.optString("notes", "")),
+                    apk, json.optLong("size", 0));
+        } finally {
+            conn.disconnect();
+        }
     }
 
     private static Release fetchFromApi() throws Exception {
@@ -111,10 +143,14 @@ public final class UpdateChecker {
     }
 
     private static HttpURLConnection open(String url) throws Exception {
+        return open(url, "application/vnd.github+json");
+    }
+
+    private static HttpURLConnection open(String url, String accept) throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setConnectTimeout(8000);
         conn.setReadTimeout(10000);
-        conn.setRequestProperty("Accept", "application/vnd.github+json");
+        conn.setRequestProperty("Accept", accept);
         conn.setRequestProperty("User-Agent", "Hermes-Android/" + BuildConfig.VERSION_NAME);
         return conn;
     }
