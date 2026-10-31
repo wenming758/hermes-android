@@ -5,7 +5,7 @@
 
 App 不内置任何固定网址：启动时自动扫描局域网里的飞牛网关，外网线路由用户自己添加。
 
-[下载 APK（Gitee，国内快）](https://gitee.com/wenming760/hermes-android/releases) ｜
+[下载 APK（Gitee 直链，国内快）](https://gitee.com/wenming760/hermes-android/raw/apk/Hermes-1.1.4.apk) ｜
 [下载 APK（GitHub Releases）](https://github.com/wenming758/hermes-android/releases/latest)
 
 应用内“检测更新”默认读取 Gitee 同步源的 `update.json`（更新清单就在仓库根目录），
